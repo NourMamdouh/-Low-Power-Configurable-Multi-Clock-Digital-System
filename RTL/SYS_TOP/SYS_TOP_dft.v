@@ -1,0 +1,527 @@
+module SYS_TOP_dft  #(
+
+parameter RX_data_wd = 8, 
+
+parameter RX_bit_count_wd = 3, //related to RX_data_wd
+
+parameter prescale_wd = 6,
+
+parameter TX_data_width=RX_data_wd,
+parameter NUM_OF_CHAINS = 4
+
+)(
+ input   wire                          scan_clk ,
+ input   wire                          scan_rst ,
+ input   wire                          test_mode ,
+ input   wire                          SE ,
+ input   wire   [NUM_OF_CHAINS-1:0]    SI ,
+ output  wire   [NUM_OF_CHAINS-1:0]    SO ,
+
+input	wire		UART_CLK,REF_CLK,RST_N,
+
+input	wire		UART_RX_IN,
+
+output  wire        UART_TX_O,
+
+output  wire        parity_error,
+
+output  wire        framing_error
+
+);
+
+
+
+localparam RX_DIV_RATIO_WD = 4;
+
+localparam RST_NUM_STAGES = 2;
+
+localparam DATA_NUM_STAGES = 2;
+
+localparam FIFO_ADDR_WD = 3;
+
+localparam REG_F_ADDR_WD = 4 ;
+
+localparam REG_F_DATA_WD = TX_data_width;
+
+localparam ALU_OP_WD = REG_F_DATA_WD;
+
+localparam ALU_FUN_WD = 4;
+
+localparam ALU_OUT_WD = ALU_OP_WD*2;
+
+
+
+wire RX_CLK, TX_CLK, UART_SYNC_RST, REF_SYNC_RST, ALU_CLK, Gate_EN, FIFO_RD_INC_PULSE, FIFO_WR_INC, ALU_OUT_VALID, REG_F_WrEn, REG_F_RdEn, ALU_EN ;
+
+
+
+wire	[prescale_wd-1:0]		prescale;
+
+
+
+wire [RX_data_wd-1:0] RX_P_DATA, RX_P_DATA_SYNC;
+
+
+
+wire [TX_data_width-1:0] FIFO_RD_DATA, FIFO_WR_DATA;
+
+
+
+wire  TX_Busy, RX_data_valid, RX_data_valid_SYNC;
+
+
+
+wire F_FULL, F_EMPTY;
+
+
+
+
+
+//wire [prescale_wd-1:0] TX_Div_Ratio;
+
+wire [RX_DIV_RATIO_WD-1:0] RX_Div_Ratio;
+
+
+
+
+
+wire [ALU_OP_WD-1:0] ALU_OP_A,ALU_OP_B;
+
+wire [ALU_FUN_WD-1:0] ALU_FUN;
+
+wire [ALU_OUT_WD-1:0] ALU_OUT;
+
+
+
+wire [REG_F_ADDR_WD-1:0] REG_F_Address;
+
+wire [REG_F_DATA_WD-1:0] REG_F_WrData, REG_F_RdData, UART_CONFIG, REG_3;
+
+
+
+/*
+
+assign PAR_EN = UART_CONFIG[0];
+
+assign PAR_TYP = UART_CONFIG[1];
+
+assign TX_Div_Ratio = REG_3[prescale_wd-1:0];
+
+assign prescale = UART_CONFIG[prescale_wd+1:2];
+
+*/
+
+
+
+///////////////////////// dft////////////////////////////////////////////////
+wire                 		       REF_SCAN_CLK;
+wire                                   UART_SCAN_CLK;
+wire                                   UART_RX_SCAN_CLK;
+wire                                   UART_TX_SCAN_CLK;
+
+wire             		       RSTN_SCAN_RST;
+wire              		       SYNC_REF_SCAN_RST;
+wire              		       SYNC_UART_SCAN_RST;
+
+//////clocks//////////
+// Mux primary REF_CLK & SCAN_CLK
+mux2X1 U0_mux2X1 (
+.IN_0(REF_CLK),
+.IN_1(scan_clk),
+.SEL(test_mode),
+.OUT(REF_SCAN_CLK)
+); 
+
+// Mux primary UART_CLK & SCAN_CLK
+mux2X1 U1_mux2X1 (
+.IN_0(UART_CLK),
+.IN_1(scan_clk),
+.SEL(test_mode),
+.OUT(UART_SCAN_CLK)
+); 
+
+// Mux generated UART_RX_CLK & SCAN_CLK
+mux2X1 U2_mux2X1 (
+.IN_0(RX_CLK),
+.IN_1(scan_clk),
+.SEL(test_mode),
+.OUT(UART_RX_SCAN_CLK)
+); 
+
+// Mux generated UART_TX_CLK & SCAN_CLK
+mux2X1 U3_mux2X1 (
+.IN_0(TX_CLK),
+.IN_1(scan_clk),
+.SEL(test_mode),
+.OUT(UART_TX_SCAN_CLK)
+);
+//////////resets///////////
+mux2X1 U4_mux2X1 (
+.IN_0(RST_N),
+.IN_1(scan_rst),
+.SEL(test_mode),
+.OUT(RSTN_SCAN_RST)
+);
+
+
+// Mux generated SYNC_REF_RST & scan_rst
+mux2X1 U5_mux2X1 (
+.IN_0(REF_SYNC_RST),
+.IN_1(scan_rst),
+.SEL(test_mode),
+.OUT(SYNC_REF_SCAN_RST)
+); 
+
+// Mux generated SYNC_UART_RST & scan_rst
+mux2X1 U6_mux2X1 (
+.IN_0(UART_SYNC_RST),
+.IN_1(scan_rst),
+.SEL(test_mode),
+.OUT(SYNC_UART_SCAN_RST)
+);
+
+
+
+////////////////////////////// RST_SYNC_1 ---> REF CLK DOMIAN //////////////////////////
+
+	RST_SYNC #(
+
+	.NUM_STAGES(RST_NUM_STAGES)) 
+
+	RST_SYNC_1 (
+
+		.CLK(REF_SCAN_CLK), 
+
+		.RST(RSTN_SCAN_RST), 
+
+		.SYNC_RST(REF_SYNC_RST)
+
+	);
+
+	
+
+	
+
+////////////////////////////// RST_SYNC_2 ---> UART CLK DOMIAN //////////////////////////	
+
+	RST_SYNC #(
+
+	.NUM_STAGES(RST_NUM_STAGES)) 
+
+	RST_SYNC_2 (
+
+		.CLK(UART_SCAN_CLK), 
+
+		.RST(RSTN_SCAN_RST), 
+
+		.SYNC_RST(UART_SYNC_RST)
+
+	);
+
+	
+
+	
+
+////////////////////////////// UART///////////////////////////	
+
+	UART #(
+
+		.RX_data_wd(RX_data_wd),
+
+		.prescale_wd(prescale_wd), 
+
+		.RX_bit_count_wd(RX_bit_count_wd),
+
+		.TX_data_width(TX_data_width))
+
+		U0_UART(
+
+		.RX_CLK(UART_RX_SCAN_CLK), 
+
+		.TX_CLK(UART_TX_SCAN_CLK), 
+
+		.RST(SYNC_UART_SCAN_RST), 
+
+		.prescale(UART_CONFIG[prescale_wd+1:2]), 
+
+		.RX_IN(UART_RX_IN), 
+
+		.PAR_TYP(UART_CONFIG[1]), 
+
+		.PAR_EN(UART_CONFIG[0]), 
+
+		.RX_P_DATA(RX_P_DATA), 
+
+		.RX_data_valid(RX_data_valid), 
+
+		.par_err(parity_error), 
+
+		.stp_err(framing_error),
+
+		.TX_P_DATA(FIFO_RD_DATA), 
+
+		.TX_DATA_VALID(!F_EMPTY), 
+
+		.TX_OUT(UART_TX_O), 
+
+		.TX_Busy(TX_Busy)
+
+	);
+
+	
+
+
+
+////////////////////////////// TX_CLK //////////////////////////	
+
+	ClkDiv #(.DIV_RATIO_WIDTH(prescale_wd)) TX_ClkDiv (
+
+		.i_ref_clk(UART_SCAN_CLK), 
+
+		.i_rst_n(SYNC_UART_SCAN_RST), 
+
+		.i_clk_en(1'd1), 
+
+		.i_div_ratio(REG_3[prescale_wd-1:0]), 
+
+		.o_div_clk(TX_CLK)
+
+	);
+
+
+
+	//assign TX_DATA_VALID = !F_EMPTY ;
+
+	
+
+
+
+////////////////////////////// RX_CLK //////////////////////////	
+
+	ClkDiv #(.DIV_RATIO_WIDTH(RX_DIV_RATIO_WD)) RX_ClkDiv (
+
+		.i_ref_clk(UART_SCAN_CLK), 
+
+		.i_rst_n(SYNC_UART_SCAN_RST), 
+
+		.i_clk_en(1'd1), 
+
+		.i_div_ratio(RX_Div_Ratio), 
+
+		.o_div_clk(RX_CLK)
+
+	);
+
+
+
+
+
+	RX_DIV_R_CALC #(.DIV_RATIO_WIDTH(RX_DIV_RATIO_WD), .prescale_wd(prescale_wd)) U0_RX_DIV_R_CALC (
+
+	.prescale(UART_CONFIG[prescale_wd+1:2]),
+
+	.RX_Div_Ratio(RX_Div_Ratio));
+
+	
+
+	
+
+////////////////////////////// ALU_CLK //////////////////////////		
+
+	CLK_GATE U0_CLK_GATE(
+
+	.CLK_EN(Gate_EN | test_mode),
+
+	.CLK(REF_SCAN_CLK),
+
+	.GATED_CLK(ALU_CLK)
+
+	);
+
+
+
+	
+
+//////////////////////////////////////// RX TO REF DATA SYNC ///////////////////////
+
+	DATA_SYNC #(
+
+	.NUM_STAGES(DATA_NUM_STAGES),
+
+	.BUS_WIDTH(RX_data_wd)) U0_DATA_SYNC (
+
+		.CLK(REF_SCAN_CLK), 
+
+		.RST(SYNC_REF_SCAN_RST), 
+
+		.bus_enable(RX_data_valid), 
+
+		.Unsync_bus(RX_P_DATA), 
+
+		.sync_bus(RX_P_DATA_SYNC), 
+
+		.enable_pulse(RX_data_valid_SYNC)
+
+	);
+
+
+
+
+
+//////////////////////////////////////// SYS_CNTRL TO TX ASYNC_FIFO ///////////////////////
+
+	ASYNC_FIFO #(
+
+	.DATA_WIDTH(TX_data_width),
+
+	.ADDR_WIDTH(FIFO_ADDR_WD)) CTRL_2_TX_FIFO (
+
+	.R_CLK(UART_TX_SCAN_CLK),
+
+	.R_RST(SYNC_UART_SCAN_RST), 		
+
+	.W_CLK(REF_SCAN_CLK),
+
+	.W_RST(SYNC_REF_SCAN_RST), 		
+
+	.W_INC(FIFO_WR_INC), 		
+
+	.R_INC(FIFO_RD_INC_PULSE), 		 
+
+	.WR_DATA(FIFO_WR_DATA),	
+
+	.RD_DATA(FIFO_RD_DATA),	
+
+	.FULL(F_FULL),		
+
+	.EMPTY(F_EMPTY)	
+
+	);
+
+
+
+
+
+//////////////////////////////////////// FIFO_RD_INC PULSE GENERATOR///////////////////////////////////
+
+	PULSE_GEN U0_PULSE_GEN(
+
+	.CLK(UART_TX_SCAN_CLK),
+
+	.RST(SYNC_UART_SCAN_RST),
+
+	.IN(TX_Busy),
+
+	.OUT(FIFO_RD_INC_PULSE));
+
+
+
+
+
+//////////////////////////////////ALU/////////////////////////////
+
+	ALU #(.op_size(ALU_OP_WD),.rslt_size(ALU_OUT_WD),.fun_size(ALU_FUN_WD)) U0_ALU (
+
+		.CLK(ALU_CLK), 
+
+		.RST(SYNC_REF_SCAN_RST), 
+
+		.ALU_EN(ALU_EN), 
+
+		.A(ALU_OP_A), 
+
+		.B(ALU_OP_B), 
+
+		.ALU_FUN(ALU_FUN), 
+
+		.ALU_OUT(ALU_OUT),
+
+		.OUT_VALID(ALU_OUT_VALID)
+
+	);
+
+
+
+
+
+/////////////////////////////////REG FILE///////////////////////////////
+
+	Reg_File #(.ADDR_WD(REG_F_ADDR_WD),.DATA_WD(REG_F_DATA_WD)) U0_RegFile (
+
+		.CLK(REF_SCAN_CLK), 
+
+		.RST(SYNC_REF_SCAN_RST), 
+
+		.WrEn(REG_F_WrEn), 
+
+		.RdEn(REG_F_RdEn), 
+
+		.Address(REG_F_Address), 
+
+		.WrData(REG_F_WrData), 
+
+		.RdData(REG_F_RdData),
+
+		.REG_0(ALU_OP_A),
+
+		.REG_1(ALU_OP_B),
+
+		.REG_2(UART_CONFIG),
+
+		.REG_3(REG_3)
+
+	);
+
+
+
+	
+
+
+
+/////////////////////////////////SYSTEM COTROL///////////////////////////////////////////////////////
+
+
+
+	SYS_CNTRL #(.DATA_WD(TX_data_width),.REG_ADDR_WD(REG_F_ADDR_WD),.ALU_FUN_WD(ALU_FUN_WD),.ALU_OUT_WD(ALU_OUT_WD)) U0_SYS_CNTRL (
+
+	.CLK(REF_SCAN_CLK),
+
+	.RST(SYNC_REF_SCAN_RST),
+
+	.REG_RD_D(REG_F_RdData), 
+
+	.ALU_OUT(ALU_OUT), 
+
+	.DATA_SYNC(RX_P_DATA_SYNC),
+
+	.FIFO_FULL(F_FULL), 
+
+	.ALU_OUT_VALID(ALU_OUT_VALID), 
+
+	.VALID_SYNC(RX_data_valid_SYNC),
+
+	.REG_WR_D(REG_F_WrData), 
+
+	.FIFO_WR_D(FIFO_WR_DATA), 
+
+	.REG_ADDR(REG_F_Address),
+
+	.ALU_FUN(ALU_FUN),
+
+	.REG_WR_EN(REG_F_WrEn), 
+
+	.REG_RD_EN(REG_F_RdEn), 
+
+	.ALU_EN(ALU_EN), 
+
+	.GATE_EN(Gate_EN), 
+
+	.FIFO_WR_INC(FIFO_WR_INC)
+
+	);
+
+
+
+	
+
+endmodule

@@ -1,0 +1,15 @@
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW01_sub_0/CO is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW01_add_0/CO is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW01_add_1/CO is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW_div_uns_1/remainder[7] is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW_div_uns_1/remainder[6] is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW_div_uns_1/remainder[5] is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW_div_uns_1/remainder[4] is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW_div_uns_1/remainder[3] is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW_div_uns_1/remainder[2] is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW_div_uns_1/remainder[1] is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW_div_uns_1/remainder[0] is undriven.
+Info:  Net Imp:/WORK/ALU_op_size8_rslt_size16_fun_size4_DW_div_uns_1/divide_by_0 is undriven.
+Info:  guide_uniquify 105 (Line: 810)  Cannot find object "U0_ALU/dp_cluster_0/mult_53" in design 'SYS_TOP'.
+Info:  Pre-verification of Ref:/WORK/ALU_op_size8_rslt_size16_fun_size4/div_56 SUCCEEDED.
+Info:  Pre-verification of Ref:/WORK/ALU_op_size8_rslt_size16_fun_size4/mult_53 SUCCEEDED.
